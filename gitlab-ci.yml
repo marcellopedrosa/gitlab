@@ -79,7 +79,7 @@ docker_build:
     echo "networks:" >> docker-compose.yml
     echo "  default:" >> docker-compose.yml 
     echo "    name: webapi" >> docker-compose.yml
-  - scp docker-compose.yml ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS}:${PROJECT_PATH_COMPOSE}/
+  - scp -o StrictHostKeyChecking=no docker-compose.yml ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS}:${PROJECT_PATH_COMPOSE}/
   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} 'docker-compose stop "${CI_PROJECT_NAME}" 2>/dev/null || true' 
   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} 'docker-compose rm -f "${CI_PROJECT_NAME}" 2>/dev/null || true' 
   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} 'cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d'
@@ -122,7 +122,7 @@ docker_production:
     echo "networks:" >> docker-compose.yml
     echo "  default:" >> docker-compose.yml 
     echo "    name: webapi" >> docker-compose.yml
-  - scp docker-compose.yml ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS}:${PROJECT_PATH_COMPOSE}/
+  - scp -o StrictHostKeyChecking=no docker-compose.yml ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS}:${PROJECT_PATH_COMPOSE}/
   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} 'docker-compose stop "${CI_PROJECT_NAME}" 2>/dev/null || true' 
   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} 'docker-compose rm -f "${CI_PROJECT_NAME}" 2>/dev/null || true' 
   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} 'cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d'
