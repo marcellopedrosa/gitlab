@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 #nome do projeto
 projeto=$1
