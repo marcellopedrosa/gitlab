@@ -1,3 +1,6 @@
+cache:
+  paths: []
+
 stages:
   - maven_project_build
   - docker_qa_build
@@ -10,7 +13,7 @@ variables:
   IMAGE: "${CI_REGISTRY_NAMESPACE}/${CI_PROJECT_NAME}"
   IMAGE_LATEST: "${IMAGE}:latest"
   CONTAINER_PORT: "8080"
-  PROJECT_PATH_JAR: "${CI_PROJECT_NAME}-api"
+  PROJECT_PATH_JAR: "application"
   PROJECT_PATH_COMPOSE: "/home/${CI_REGISTRY_USER}"
 
 maven_project_build:
@@ -19,18 +22,19 @@ maven_project_build:
   variables:
     MAVEN_OPTS: "-Dmaven.wagon.http.ssl.insecure=true"
   before_script:
-   - mvn clean install -pl ${CI_PROJECT_NAME}-core,${CI_PROJECT_NAME}-service,${CI_PROJECT_NAME}-api -s settings.xml
-  script:  
-   - mv ${CI_PROJECT_NAME}-api/target/${CI_PROJECT_NAME}.jar ${CI_PROJECT_NAME}-api/target/${APPLICATION_NAME}.jar
+    - mvn clean install -pl domain,infrastructure,usecase,application -s settings.xml
+  script:
+    - mv ${PROJECT_PATH_JAR}/target/${PROJECT_PATH_JAR}.jar ${PROJECT_PATH_JAR}/target/${APPLICATION_NAME}.jar
   after_script:
-   - rm -rvf /usr/local/repository/br/com/fachesf/war/${CI_PROJECT_NAME}.war
-   - cp ${PROJECT_PATH_JAR}/target/${CI_PROJECT_NAME}.war /usr/local/repository/br/com/fachesf/war/
+  - mv ${PROJECT_PATH_JAR}/target/${PROJECT_PATH_JAR}.war ${PROJECT_PATH_JAR}/target/${CI_PROJECT_NAME}.war
+  - rm -rvf /usr/local/repository/br/com/fachesf/war/${CI_PROJECT_NAME}.war
+  - cp ${PROJECT_PATH_JAR}/target/${CI_PROJECT_NAME}.war /usr/local/repository/br/com/fachesf/war/
   artifacts:
     paths:
-     - ${CI_PROJECT_NAME}-api/target/${APPLICATION_NAME}.jar
-     - fn_versao.sh
+    - ${PROJECT_PATH_JAR}/target/${APPLICATION_NAME}.jar
+    - fn_versao.sh
   only:
-   - quality
+  - quality
 
 docker_qa_build:
   stage: docker_qa_build
@@ -45,12 +49,11 @@ docker_qa_build:
    - echo "POM_VERSAO=$retorno" > store_versao.env
   script:
    - source store_versao.env
-   - docker rmi ${IMAGE}:${POM_VERSAO}
+   - docker rmi ${IMAGE}:${POM_VERSAO} 2>/dev/null || true
    - docker build --build-arg DEPLOY_NAME_TEMP=${APPLICATION_NAME} --build-arg DEPLOY_NAME_FINAL=${CI_PROJECT_NAME} --build-arg PROJECT_PATH_JAR=${PROJECT_PATH_JAR} -t ${IMAGE}:${POM_VERSAO} .
    - docker push ${IMAGE}:${POM_VERSAO}
   after_script:
    - source store_versao.env  
-   - docker buildx prune --all --force
    - |
     echo "version: '3.9'" > docker-compose.yml
     echo "services: " >> docker-compose.yml
