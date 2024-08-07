@@ -14,7 +14,7 @@ variables:
   IMAGE_LATEST: "${IMAGE}:latest"
   CONTAINER_PORT: "8080"
   PROJECT_PATH_JAR: "application"
-  PROJECT_PATH_COMPOSE: "/home/${CI_REGISTRY_USER}"
+  PROJECT_PATH_COMPOSE: "/home/${CI_REGISTRY_USER}/${CI_PROJECT_NAME}"
 
 maven_project_build:
   stage: maven_project_build
@@ -60,7 +60,7 @@ docker_qa_build:
     echo "  ${CI_PROJECT_NAME}: " >> docker-compose.yml
     echo "    image: ${IMAGE}:${POM_VERSAO}" >> docker-compose.yml
     echo "    command: java -jar /app/${CI_PROJECT_NAME}.jar" >> docker-compose.yml
-    echo "    container_name: ${CI_PROJECT_NAME}-PIPELINE-${CI_PIPELINE_ID}_${POM_VERSAO}-QA" >> docker-compose.yml
+    echo "    container_name: ${CI_PROJECT_NAME}-PPL-${CI_PIPELINE_ID}_POM-${POM_VERSAO}-QA" >> docker-compose.yml
     echo "    hostname: docker-qa" >> docker-compose.yml
     echo "    environment: " >> docker-compose.yml
     echo "      JAVA_OPTS: \"-XX:+UseG1GC -Xms128 -Xmx512m -XX:NewSize=128m -XX:MaxNewSize=256m\"" >> docker-compose.yml
@@ -87,10 +87,10 @@ docker_qa_build:
     echo "networks:" >> docker-compose.yml
     echo "  default:" >> docker-compose.yml 
     echo "    name: webapi" >> docker-compose.yml
+   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} "mkdir -p ${PROJECT_PATH_COMPOSE} 2>/dev/null || true"
    - scp -o StrictHostKeyChecking=no docker-compose.yml ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS}:${PROJECT_PATH_COMPOSE}/
-   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} 'docker-compose stop "${CI_PROJECT_NAME}" 2>/dev/null || true' 
-   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} 'docker-compose rm -f "${CI_PROJECT_NAME}" 2>/dev/null || true' 
-   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} 'cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d'
+   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} "docker-compose down ${CI_PROJECT_NAME} 2>/dev/null || true"
+   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} "cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d"
   dependencies:
    - maven_project_build
   only:
@@ -104,8 +104,8 @@ docker_prd_deploy:
    - echo "POM_VERSAO=$retorno" > store_versao.env
   script:
    - source store_versao.env
-   - docker rmi -f ${IMAGE_LATEST}
-   - docker rmi -f ${IMAGE}:${POM_VERSAO}-PRD
+   - docker rmi -f ${IMAGE_LATEST} 2>/dev/null || true
+   - docker rmi -f ${IMAGE}:${POM_VERSAO}-PRD 2>/dev/null || true
    - docker tag ${IMAGE}:${POM_VERSAO} ${IMAGE_LATEST}
    - docker push ${IMAGE_LATEST}
    - docker tag ${IMAGE}:${POM_VERSAO} ${IMAGE}:${POM_VERSAO}-PRD
@@ -116,9 +116,9 @@ docker_prd_deploy:
     echo "version: '3.9'" > docker-compose.yml
     echo "services: " >> docker-compose.yml
     echo "  ${CI_PROJECT_NAME}: " >> docker-compose.yml
-    echo "    image: ${IMAGE_LATEST}" >> docker-compose.yml
+    echo "    image: ${IMAGE}:${POM_VERSAO}-PRD" >> docker-compose.yml
     echo "    command: java -jar /app/${CI_PROJECT_NAME}.jar" >> docker-compose.yml
-    echo "    container_name: ${CI_PROJECT_NAME}-PIPELINE-${CI_PIPELINE_ID}_${POM_VERSAO}-PRD" >> docker-compose.yml
+    echo "    container_name: ${CI_PROJECT_NAME}-PPL-${CI_PIPELINE_ID}_POM-${POM_VERSAO}-PRD" >> docker-compose.yml
     echo "    hostname: docker-prd" >> docker-compose.yml
     echo "    environment: " >> docker-compose.yml
     echo "      JAVA_OPTS: \"-XX:+UseG1GC -Xms128 -Xmx512m -XX:NewSize=128m -XX:MaxNewSize=256m\"" >> docker-compose.yml
@@ -145,13 +145,13 @@ docker_prd_deploy:
     echo "networks:" >> docker-compose.yml
     echo "  default:" >> docker-compose.yml 
     echo "    name: webapi" >> docker-compose.yml
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "mkdir -p ${PROJECT_PATH_COMPOSE} 2>/dev/null || true"
    - scp -o StrictHostKeyChecking=no docker-compose.yml ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS}:${PROJECT_PATH_COMPOSE}/
-   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} 'docker-compose stop "${CI_PROJECT_NAME}" 2>/dev/null || true' 
-   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} 'docker-compose rm -f "${CI_PROJECT_NAME}" 2>/dev/null || true' 
-   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} 'cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d'
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "docker-compose down ${CI_PROJECT_NAME} 2>/dev/null || true"
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d"
   only:
    - main
-
+ 
 docker_prd_deploy_rollback:
   stage: docker_prd_deploy_rollback
   script:
@@ -161,7 +161,7 @@ docker_prd_deploy_rollback:
     echo "  ${CI_PROJECT_NAME}: " >> docker-compose.yml
     echo "    image: ${IMAGE}:${POM_VERSAO}" >> docker-compose.yml
     echo "    command: java -jar /app/${CI_PROJECT_NAME}.jar" >> docker-compose.yml
-    echo "    container_name: ${CI_PROJECT_NAME}-PIPELINE-${CI_PIPELINE_ID}_${POM_VERSAO}-ROLLBACK" >> docker-compose.yml
+    echo "    container_name: ${CI_PROJECT_NAME}-PPL-${CI_PIPELINE_ID}_POM-${POM_VERSAO}-RBK" >> docker-compose.yml
     echo "    hostname: docker-prd" >> docker-compose.yml
     echo "    environment: " >> docker-compose.yml
     echo "      JAVA_OPTS: \"-XX:+UseG1GC -Xms128 -Xmx512m -XX:NewSize=128m -XX:MaxNewSize=256m\"" >> docker-compose.yml
@@ -188,9 +188,9 @@ docker_prd_deploy_rollback:
     echo "networks:" >> docker-compose.yml
     echo "  default:" >> docker-compose.yml 
     echo "    name: webapi" >> docker-compose.yml
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "mkdir -p ${PROJECT_PATH_COMPOSE} 2>/dev/null || true"
    - scp -o StrictHostKeyChecking=no docker-compose.yml ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS}:${PROJECT_PATH_COMPOSE}/
-   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} 'docker-compose stop "${CI_PROJECT_NAME}" 2>/dev/null || true' 
-   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} 'docker-compose rm -f "${CI_PROJECT_NAME}" 2>/dev/null || true' 
-   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} 'cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d'
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "docker-compose down ${CI_PROJECT_NAME} 2>/dev/null || true"
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d"
   only:
    - rollback
