@@ -116,7 +116,7 @@ docker_prd_deploy:
     echo "version: '3.9'" > docker-compose.yml
     echo "services: " >> docker-compose.yml
     echo "  ${CI_PROJECT_NAME}: " >> docker-compose.yml
-    echo "    image: ${IMAGE}:${POM_VERSAO}-PRD" >> docker-compose.yml
+    echo "    image: ${IMAGE_LATEST}" >> docker-compose.yml
     echo "    command: java -jar /app/${CI_PROJECT_NAME}.jar" >> docker-compose.yml
     echo "    container_name: ${CI_PROJECT_NAME}-PPL-${CI_PIPELINE_ID}_POM-${POM_VERSAO}-PRD" >> docker-compose.yml
     echo "    hostname: docker-prd" >> docker-compose.yml
