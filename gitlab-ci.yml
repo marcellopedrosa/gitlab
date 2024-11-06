@@ -61,20 +61,21 @@ docker_qa_build:
     echo "    image: ${IMAGE}:${POM_VERSAO}" >> docker-compose.yml
     echo "    command: java -jar /app/${CI_PROJECT_NAME}.jar" >> docker-compose.yml
     echo "    container_name: ${CI_PROJECT_NAME}-PPL-${CI_PIPELINE_ID}_POM-${POM_VERSAO}-QA" >> docker-compose.yml
-    echo "    hostname: docker-qa" >> docker-compose.yml
+    echo "    hostname: ${CI_DOCKER_HOSTNAME_QA}" >> docker-compose.yml
     echo "    environment: " >> docker-compose.yml
-    echo "      JAVA_OPTS: \"-XX:+UseG1GC -Xms128 -Xmx512m -XX:NewSize=128m -XX:MaxNewSize=256m\"" >> docker-compose.yml
+    echo "      TZ: ${CI_ENV_TIME_ZONE}" >> docker-compose.yml
+    echo "      JAVA_OPTS: \"${CI_ENV_JAVA_OPTS}\"" >> docker-compose.yml
     echo "    deploy:" >> docker-compose.yml
     echo "      resources:" >> docker-compose.yml
     echo "        limits:" >> docker-compose.yml
-    echo "          memory: 1G" >> docker-compose.yml
+    echo "          memory: ${CI_DOCKER_LIMIT_MEMORY}" >> docker-compose.yml
     echo "    ports:" >> docker-compose.yml
     echo "      - '${CONTAINER_PORT}'" >> docker-compose.yml
     echo "    dns:" >> docker-compose.yml
-    echo "      - 192.168.0.111" >> docker-compose.yml
-    echo "      - 192.168.0.11" >> docker-compose.yml
+    echo "      - ${CI_DNS_PRIMARY}" >> docker-compose.yml
+    echo "      - ${CI_DNS_SECONDARY}" >> docker-compose.yml
     echo "    dns_search:" >> docker-compose.yml
-    echo "      - fachesf.com.br" >> docker-compose.yml
+    echo "      - ${CI_DNS_SEARCH}" >> docker-compose.yml
     echo "    networks:" >> docker-compose.yml
     echo "      - default" >> docker-compose.yml
     echo "    volumes:" >> docker-compose.yml
@@ -116,23 +117,24 @@ docker_prd_deploy:
     echo "version: '3.9'" > docker-compose.yml
     echo "services: " >> docker-compose.yml
     echo "  ${CI_PROJECT_NAME}: " >> docker-compose.yml
-    echo "    image: ${IMAGE_LATEST}" >> docker-compose.yml
+    echo "    image: ${IMAGE}:${POM_VERSAO}-PRD" >> docker-compose.yml
     echo "    command: java -jar /app/${CI_PROJECT_NAME}.jar" >> docker-compose.yml
     echo "    container_name: ${CI_PROJECT_NAME}-PPL-${CI_PIPELINE_ID}_POM-${POM_VERSAO}-PRD" >> docker-compose.yml
-    echo "    hostname: docker-prd" >> docker-compose.yml
+    echo "    hostname: ${CI_DOCKER_HOSTNAME_PRD}" >> docker-compose.yml
     echo "    environment: " >> docker-compose.yml
-    echo "      JAVA_OPTS: \"-XX:+UseG1GC -Xms128 -Xmx512m -XX:NewSize=128m -XX:MaxNewSize=256m\"" >> docker-compose.yml
+    echo "      TZ: ${CI_ENV_TIME_ZONE}" >> docker-compose.yml
+    echo "      JAVA_OPTS: \"${CI_ENV_JAVA_OPTS}\"" >> docker-compose.yml
     echo "    deploy:" >> docker-compose.yml
     echo "      resources:" >> docker-compose.yml
     echo "        limits:" >> docker-compose.yml
-    echo "          memory: 1G" >> docker-compose.yml
+    echo "          memory: ${CI_DOCKER_LIMIT_MEMORY}" >> docker-compose.yml
     echo "    ports:" >> docker-compose.yml
     echo "      - '${CONTAINER_PORT}'" >> docker-compose.yml
     echo "    dns:" >> docker-compose.yml
-    echo "      - 192.168.0.111" >> docker-compose.yml
-    echo "      - 192.168.0.11" >> docker-compose.yml
+    echo "      - ${CI_DNS_PRIMARY}" >> docker-compose.yml
+    echo "      - ${CI_DNS_SECONDARY}" >> docker-compose.yml
     echo "    dns_search:" >> docker-compose.yml
-    echo "      - fachesf.com.br" >> docker-compose.yml
+    echo "      - ${CI_DNS_SEARCH}" >> docker-compose.yml
     echo "    networks:" >> docker-compose.yml
     echo "      - default" >> docker-compose.yml
     echo "    volumes:" >> docker-compose.yml
@@ -151,7 +153,7 @@ docker_prd_deploy:
    - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d"
   only:
    - main
- 
+
 docker_prd_deploy_rollback:
   stage: docker_prd_deploy_rollback
   script:
@@ -162,20 +164,21 @@ docker_prd_deploy_rollback:
     echo "    image: ${IMAGE}:${POM_VERSAO}" >> docker-compose.yml
     echo "    command: java -jar /app/${CI_PROJECT_NAME}.jar" >> docker-compose.yml
     echo "    container_name: ${CI_PROJECT_NAME}-PPL-${CI_PIPELINE_ID}_POM-${POM_VERSAO}-RBK" >> docker-compose.yml
-    echo "    hostname: docker-prd" >> docker-compose.yml
+    echo "    hostname: ${CI_DOCKER_HOSTNAME_PRD}" >> docker-compose.yml
     echo "    environment: " >> docker-compose.yml
-    echo "      JAVA_OPTS: \"-XX:+UseG1GC -Xms128 -Xmx512m -XX:NewSize=128m -XX:MaxNewSize=256m\"" >> docker-compose.yml
+    echo "      TZ: ${CI_ENV_TIME_ZONE}" >> docker-compose.yml
+    echo "      JAVA_OPTS: \"${CI_ENV_JAVA_OPTS}\"" >> docker-compose.yml
     echo "    deploy:" >> docker-compose.yml
     echo "      resources:" >> docker-compose.yml
     echo "        limits:" >> docker-compose.yml
-    echo "          memory: 1G" >> docker-compose.yml
+    echo "          memory: ${CI_DOCKER_LIMIT_MEMORY}" >> docker-compose.yml
     echo "    ports:" >> docker-compose.yml
     echo "      - '${CONTAINER_PORT}'" >> docker-compose.yml
     echo "    dns:" >> docker-compose.yml
-    echo "      - 192.168.0.111" >> docker-compose.yml
-    echo "      - 192.168.0.11" >> docker-compose.yml
+    echo "      - ${CI_DNS_PRIMARY}" >> docker-compose.yml
+    echo "      - ${CI_DNS_SECONDARY}" >> docker-compose.yml
     echo "    dns_search:" >> docker-compose.yml
-    echo "      - fachesf.com.br" >> docker-compose.yml
+    echo "      - ${CI_DNS_SEARCH}" >> docker-compose.yml
     echo "    networks:" >> docker-compose.yml
     echo "      - default" >> docker-compose.yml
     echo "    volumes:" >> docker-compose.yml
