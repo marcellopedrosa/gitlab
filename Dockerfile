@@ -1,18 +1,23 @@
-FROM openjdk:11-jre-stretch
+ARG IMAGE
 
-ARG DEPLOY_NAME_TEMP
-ARG DEPLOY_NAME_FINAL
+# Imagem base
+FROM $IMAGE
+
+ARG APPLICATION_NAME
+ARG CI_PROJECT_NAME
 ARG PROJECT_PATH_JAR
 
-ENV LANG en_US.ISO-8859-1
-ENV PATH_FACHESF_PROPERTIES=/etc/fachesf
-
+# Configuração do workdir
 WORKDIR /app
 
-COPY $PROJECT_PATH_JAR/target/$DEPLOY_NAME_TEMP.jar /app/$DEPLOY_NAME_FINAL.jar
+# Copiar o arquivo .jar gerado pelo stage:maven_project_build para o contêiner
+COPY $PROJECT_PATH_JAR/target/$APPLICATION_NAME.jar /app/$CI_PROJECT_NAME.jar
 
-RUN chmod +x /app/$DEPLOY_NAME_FINAL.jar
+# tonar aplica executável
+RUN chmod +x /app/$CI_PROJECT_NAME.jar
 
+# Expõe a porta 8080
 EXPOSE 8080
 
-CMD ["bash", "-c", "java -jar /app/$DEPLOY_NAME_FINAL.jar"]
+# Comando padrão
+CMD ["java", "-jar", /app/$CI_PROJECT_NAME.jar]
