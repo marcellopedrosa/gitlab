@@ -13,7 +13,7 @@ variables:
   IMAGE: "${CI_REGISTRY_NAMESPACE}/${CI_PROJECT_NAME}"
   IMAGE_LATEST: "${IMAGE}:latest"
   CONTAINER_PORT: "8080"
-  PROJECT_PATH_JAR: "${CI_PROJECT_NAME}-api"
+  PROJECT_PATH_JAR: "application"
   PROJECT_PATH_COMPOSE: "/home/${CI_REGISTRY_USER}/${CI_PROJECT_NAME}"
 
 maven_project_build:
@@ -22,18 +22,19 @@ maven_project_build:
   variables:
     MAVEN_OPTS: "-Dmaven.wagon.http.ssl.insecure=true"
   before_script:
-   - mvn clean install -pl ${CI_PROJECT_NAME}-core,${CI_PROJECT_NAME}-service,${CI_PROJECT_NAME}-api -s settings.xml
-  script:  
-   - mv ${CI_PROJECT_NAME}-api/target/${CI_PROJECT_NAME}.jar ${CI_PROJECT_NAME}-api/target/${APPLICATION_NAME}.jar
+    - mvn clean install -pl domain,infrastructure,usecase,application -s settings.xml
+  script:
+    - mv ${PROJECT_PATH_JAR}/target/${PROJECT_PATH_JAR}.jar ${PROJECT_PATH_JAR}/target/${APPLICATION_NAME}.jar
   after_script:
-   - rm -rvf /usr/local/repository/br/com/empresa/war/${CI_PROJECT_NAME}.war
-   - cp ${PROJECT_PATH_JAR}/target/${CI_PROJECT_NAME}.war /usr/local/repository/br/com/empresa/war/
+  - mv ${PROJECT_PATH_JAR}/target/${PROJECT_PATH_JAR}.war ${PROJECT_PATH_JAR}/target/${CI_PROJECT_NAME}.war
+  - rm -rvf /usr/local/repository/br/com/fachesf/war/${CI_PROJECT_NAME}.war
+  - cp ${PROJECT_PATH_JAR}/target/${CI_PROJECT_NAME}.war /usr/local/repository/br/com/fachesf/war/
   artifacts:
     paths:
-     - ${CI_PROJECT_NAME}-api/target/${APPLICATION_NAME}.jar
-     - fn_versao.sh
+    - ${PROJECT_PATH_JAR}/target/${APPLICATION_NAME}.jar
+    - fn_versao.sh
   only:
-   - quality
+  - quality
 
 docker_qa_build:
   stage: docker_qa_build
@@ -67,7 +68,7 @@ docker_qa_build:
     echo "    hostname: ${CI_DOCKER_HOSTNAME_QA}" >> docker-compose.yml
     echo "    environment: " >> docker-compose.yml
     echo "      TZ: ${CI_ENV_TIME_ZONE}" >> docker-compose.yml
-    echo "      PATH_EMPRESA_PROPERTIES: ${CI_ENV_PROPERTIES}" >> docker-compose.yml
+    echo "      PATH_FACHESF_PROPERTIES: ${CI_ENV_PROPERTIES}" >> docker-compose.yml
     echo "      JAVA_OPTS: \"${CI_ENV_JAVA_OPTS}\"" >> docker-compose.yml
     echo "    deploy:" >> docker-compose.yml
     echo "      resources:" >> docker-compose.yml
@@ -83,7 +84,7 @@ docker_qa_build:
     echo "    networks:" >> docker-compose.yml
     echo "      - default" >> docker-compose.yml
     echo "    volumes:" >> docker-compose.yml
-    echo "      - /etc/empresa:/etc/empresa" >> docker-compose.yml
+    echo "      - /etc/fachesf:/etc/fachesf" >> docker-compose.yml
     echo "      - /etc/resolv.conf.docker:/etc/resolv.conf" >> docker-compose.yml
     echo "    restart: unless-stopped" >> docker-compose.yml
     echo "    labels:" >> docker-compose.yml
@@ -121,7 +122,7 @@ docker_prd_deploy:
     echo "    hostname: ${CI_DOCKER_HOSTNAME_PRD}" >> docker-compose.yml
     echo "    environment: " >> docker-compose.yml
     echo "      TZ: ${CI_ENV_TIME_ZONE}" >> docker-compose.yml
-    echo "      PATH_EMPRESA_PROPERTIES: ${CI_ENV_PROPERTIES}" >> docker-compose.yml
+    echo "      PATH_FACHESF_PROPERTIES: ${CI_ENV_PROPERTIES}" >> docker-compose.yml
     echo "      JAVA_OPTS: \"${CI_ENV_JAVA_OPTS}\"" >> docker-compose.yml
     echo "    deploy:" >> docker-compose.yml
     echo "      resources:" >> docker-compose.yml
@@ -137,7 +138,7 @@ docker_prd_deploy:
     echo "    networks:" >> docker-compose.yml
     echo "      - default" >> docker-compose.yml
     echo "    volumes:" >> docker-compose.yml
-    echo "      - /etc/empresa:/etc/empresa" >> docker-compose.yml
+    echo "      - /etc/fachesf:/etc/fachesf" >> docker-compose.yml
     echo "      - /etc/resolv.conf.docker:/etc/resolv.conf" >> docker-compose.yml
     echo "    restart: unless-stopped" >> docker-compose.yml
     echo "    labels:" >> docker-compose.yml
@@ -167,7 +168,7 @@ docker_prd_deploy_rollback:
     echo "    hostname: ${CI_DOCKER_HOSTNAME_PRD}" >> docker-compose.yml
     echo "    environment: " >> docker-compose.yml
     echo "      TZ: ${CI_ENV_TIME_ZONE}" >> docker-compose.yml
-    echo "      PATH_EMPRESA_PROPERTIES: ${CI_ENV_PROPERTIES}" >> docker-compose.yml
+    echo "      PATH_FACHESF_PROPERTIES: ${CI_ENV_PROPERTIES}" >> docker-compose.yml
     echo "      JAVA_OPTS: \"${CI_ENV_JAVA_OPTS}\"" >> docker-compose.yml
     echo "    deploy:" >> docker-compose.yml
     echo "      resources:" >> docker-compose.yml
@@ -183,7 +184,7 @@ docker_prd_deploy_rollback:
     echo "    networks:" >> docker-compose.yml
     echo "      - default" >> docker-compose.yml
     echo "    volumes:" >> docker-compose.yml
-    echo "      - /etc/empresa:/etc/empresa" >> docker-compose.yml
+    echo "      - /etc/fachesf:/etc/fachesf" >> docker-compose.yml
     echo "      - /etc/resolv.conf.docker:/etc/resolv.conf" >> docker-compose.yml
     echo "    restart: unless-stopped" >> docker-compose.yml
     echo "    labels:" >> docker-compose.yml
