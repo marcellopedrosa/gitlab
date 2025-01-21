@@ -1,0 +1,202 @@
+cache:
+  paths: []
+
+stages:
+  - maven_project_build
+  - docker_qa_build
+  - docker_prd_deploy
+  - docker_prd_deploy_rollback
+
+variables:  
+  TAG: "JOB-${CI_PIPELINE_ID}"
+  APPLICATION_NAME: "${CI_PROJECT_NAME}-${TAG}"
+  IMAGE: "${CI_REGISTRY_NAMESPACE}/${CI_PROJECT_NAME}"
+  IMAGE_LATEST: "${IMAGE}:latest"
+  CONTAINER_PORT: "8080"
+  PROJECT_PATH_JAR: "application"
+  PROJECT_PATH_COMPOSE: "/home/${CI_REGISTRY_USER}/${CI_PROJECT_NAME}"
+
+maven_project_build:
+  stage: maven_project_build
+  image: maven:3.6.3-jdk-11
+  variables:
+    MAVEN_OPTS: "-Dmaven.wagon.http.ssl.insecure=true"
+  before_script:
+    - mvn clean install -pl domain,infrastructure,usecase,application -s settings.xml
+  script:
+    - mv ${PROJECT_PATH_JAR}/target/${PROJECT_PATH_JAR}.jar ${PROJECT_PATH_JAR}/target/${APPLICATION_NAME}.jar
+  after_script:
+  - mv ${PROJECT_PATH_JAR}/target/${PROJECT_PATH_JAR}.war ${PROJECT_PATH_JAR}/target/${CI_PROJECT_NAME}.war
+  - rm -rvf /usr/local/repository/br/com/empresa/war/${CI_PROJECT_NAME}.war
+  - cp ${PROJECT_PATH_JAR}/target/${CI_PROJECT_NAME}.war /usr/local/repository/br/com/empresa/war/
+  artifacts:
+    paths:
+    - ${PROJECT_PATH_JAR}/target/${APPLICATION_NAME}.jar
+    - fn_versao.sh
+  only:
+  - quality
+
+docker_qa_build:
+  stage: docker_qa_build
+  image: docker:latest
+  variables: 
+   DOCKER_DRIVER: overlay2
+   FF_NETWORK_PER_BUILD: "true"
+  before_script:
+   - docker login ${CI_REGISTRY} --username=${CI_REGISTRY_USER} --password=${CI_REGISTRY_PASSWORD}
+   - chmod +x fn_versao.sh
+   - retorno=$(./fn_versao.sh "${CI_PROJECT_NAME}")
+   - echo "POM_VERSAO=$retorno" > store_versao.env
+  script:
+   - source store_versao.env
+   - docker image rm -f ${IMAGE}:${POM_VERSAO} 2>/dev/null || true
+   - docker build --build-arg IMAGE=${CI_DOCKER_IMAGE_LINUX_JDK} --build-arg APPLICATION_NAME=${APPLICATION_NAME} --build-arg CI_PROJECT_NAME=${CI_PROJECT_NAME} --build-arg PROJECT_PATH_JAR=${PROJECT_PATH_JAR} -t ${IMAGE}:${POM_VERSAO} .
+   - docker push ${IMAGE}:${POM_VERSAO}
+   - echo "Refazer imagem final para ser utilizada no stage de produção..."
+   - docker image rm -f ${IMAGE_LATEST} 2>/dev/null || true
+   - docker tag ${IMAGE}:${POM_VERSAO} ${IMAGE_LATEST}
+   - docker push ${IMAGE_LATEST}
+  after_script:
+   - source store_versao.env  
+   - |
+    echo "version: '3.9'" > docker-compose.yml
+    echo "services: " >> docker-compose.yml
+    echo "  ${CI_PROJECT_NAME}: " >> docker-compose.yml
+    echo "    image: ${IMAGE}:${POM_VERSAO}" >> docker-compose.yml
+    echo "    command: java -jar /app/${CI_PROJECT_NAME}.jar" >> docker-compose.yml
+    echo "    container_name: ${CI_PROJECT_NAME}-PPL-${CI_PIPELINE_ID}_POM-${POM_VERSAO}-QA" >> docker-compose.yml
+    echo "    hostname: ${CI_DOCKER_HOSTNAME_QA}" >> docker-compose.yml
+    echo "    environment: " >> docker-compose.yml
+    echo "      TZ: ${CI_ENV_TIME_ZONE}" >> docker-compose.yml
+    echo "      PATH_EMPRESA_PROPERTIES: ${CI_ENV_PROPERTIES}" >> docker-compose.yml
+    echo "      JAVA_OPTS: \"${CI_ENV_JAVA_OPTS}\"" >> docker-compose.yml
+    echo "    deploy:" >> docker-compose.yml
+    echo "      resources:" >> docker-compose.yml
+    echo "        limits:" >> docker-compose.yml
+    echo "          memory: ${CI_DOCKER_LIMIT_MEMORY}" >> docker-compose.yml
+    echo "    ports:" >> docker-compose.yml
+    echo "      - '${CONTAINER_PORT}'" >> docker-compose.yml
+    echo "    dns:" >> docker-compose.yml
+    echo "      - ${CI_DNS_PRIMARY}" >> docker-compose.yml
+    echo "      - ${CI_DNS_SECONDARY}" >> docker-compose.yml
+    echo "    dns_search:" >> docker-compose.yml
+    echo "      - ${CI_DNS_SEARCH}" >> docker-compose.yml
+    echo "    networks:" >> docker-compose.yml
+    echo "      - default" >> docker-compose.yml
+    echo "    volumes:" >> docker-compose.yml
+    echo "      - /etc/empresa:/etc/empresa" >> docker-compose.yml
+    echo "      - /etc/resolv.conf.docker:/etc/resolv.conf" >> docker-compose.yml
+    echo "    restart: unless-stopped" >> docker-compose.yml
+    echo "    labels:" >> docker-compose.yml
+    echo "      - 'traefik.enable=true'" >> docker-compose.yml
+    echo "      - 'traefik.http.routers.${CI_PROJECT_NAME}.rule=Host(\`${CI_QA_SERVER_ADDRESS}\`) && PathPrefix(\`/${CI_PROJECT_NAME}\`)'" >> docker-compose.yml
+    echo "networks:" >> docker-compose.yml
+    echo "  default:" >> docker-compose.yml 
+    echo "    name: webapi" >> docker-compose.yml
+   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} "mkdir -p ${PROJECT_PATH_COMPOSE} 2>/dev/null || true"
+   - scp -o StrictHostKeyChecking=no docker-compose.yml ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS}:${PROJECT_PATH_COMPOSE}/
+   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} "docker-compose down --remove-orphans 2>/dev/null || true"
+   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} "docker image rm ${IMAGE}:${POM_VERSAO} 2>/dev/null || true"
+   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} "docker pull ${IMAGE}:${POM_VERSAO} 2>/dev/null || true"
+   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} "cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d"
+  dependencies:
+   - maven_project_build
+  only:
+   - quality
+
+docker_prd_deploy:
+  stage: docker_prd_deploy
+  before_script:
+   - chmod +x fn_versao.sh
+   - retorno=$(./fn_versao.sh "${CI_PROJECT_NAME}")
+   - echo "POM_VERSAO=$retorno" > store_versao.env
+  script:
+   - source store_versao.env
+   - |
+    echo "version: '3.9'" > docker-compose.yml
+    echo "services: " >> docker-compose.yml
+    echo "  ${CI_PROJECT_NAME}: " >> docker-compose.yml
+    echo "    image: ${IMAGE_LATEST}" >> docker-compose.yml
+    echo "    command: java -jar /app/${CI_PROJECT_NAME}.jar" >> docker-compose.yml
+    echo "    container_name: ${CI_PROJECT_NAME}-PPL-${CI_PIPELINE_ID}_POM-${POM_VERSAO}-PRD" >> docker-compose.yml
+    echo "    hostname: ${CI_DOCKER_HOSTNAME_PRD}" >> docker-compose.yml
+    echo "    environment: " >> docker-compose.yml
+    echo "      TZ: ${CI_ENV_TIME_ZONE}" >> docker-compose.yml
+    echo "      PATH_EMPRESA_PROPERTIES: ${CI_ENV_PROPERTIES}" >> docker-compose.yml
+    echo "      JAVA_OPTS: \"${CI_ENV_JAVA_OPTS}\"" >> docker-compose.yml
+    echo "    deploy:" >> docker-compose.yml
+    echo "      resources:" >> docker-compose.yml
+    echo "        limits:" >> docker-compose.yml
+    echo "          memory: ${CI_DOCKER_LIMIT_MEMORY}" >> docker-compose.yml
+    echo "    ports:" >> docker-compose.yml
+    echo "      - '${CONTAINER_PORT}'" >> docker-compose.yml
+    echo "    dns:" >> docker-compose.yml
+    echo "      - ${CI_DNS_PRIMARY}" >> docker-compose.yml
+    echo "      - ${CI_DNS_SECONDARY}" >> docker-compose.yml
+    echo "    dns_search:" >> docker-compose.yml
+    echo "      - ${CI_DNS_SEARCH}" >> docker-compose.yml
+    echo "    networks:" >> docker-compose.yml
+    echo "      - default" >> docker-compose.yml
+    echo "    volumes:" >> docker-compose.yml
+    echo "      - /etc/empresa:/etc/empresa" >> docker-compose.yml
+    echo "      - /etc/resolv.conf.docker:/etc/resolv.conf" >> docker-compose.yml
+    echo "    restart: unless-stopped" >> docker-compose.yml
+    echo "    labels:" >> docker-compose.yml
+    echo "      - 'traefik.enable=true'" >> docker-compose.yml
+    echo "      - 'traefik.http.routers.${CI_PROJECT_NAME}.rule=Host(\`${CI_PRD_SERVER_ADDRESS}\`) && PathPrefix(\`/${CI_PROJECT_NAME}\`)'" >> docker-compose.yml
+    echo "networks:" >> docker-compose.yml
+    echo "  default:" >> docker-compose.yml 
+    echo "    name: webapi" >> docker-compose.yml
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "mkdir -p ${PROJECT_PATH_COMPOSE} 2>/dev/null || true"
+   - scp -o StrictHostKeyChecking=no docker-compose.yml ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS}:${PROJECT_PATH_COMPOSE}/
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "docker-compose down --remove-orphans 2>/dev/null || true"
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "docker image rm -f ${IMAGE_LATEST} 2>/dev/null || true"
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d"
+  only:
+   - main
+
+docker_prd_deploy_rollback:
+  stage: docker_prd_deploy_rollback
+  script:
+   - |
+    echo "version: '3.9'" > docker-compose.yml
+    echo "services: " >> docker-compose.yml
+    echo "  ${CI_PROJECT_NAME}: " >> docker-compose.yml
+    echo "    image: ${IMAGE}:${POM_VERSAO}" >> docker-compose.yml
+    echo "    command: java -jar /app/${CI_PROJECT_NAME}.jar" >> docker-compose.yml
+    echo "    container_name: ${CI_PROJECT_NAME}-PPL-${CI_PIPELINE_ID}_POM-${POM_VERSAO}-RBK" >> docker-compose.yml
+    echo "    hostname: ${CI_DOCKER_HOSTNAME_PRD}" >> docker-compose.yml
+    echo "    environment: " >> docker-compose.yml
+    echo "      TZ: ${CI_ENV_TIME_ZONE}" >> docker-compose.yml
+    echo "      PATH_EMPRESA_PROPERTIES: ${CI_ENV_PROPERTIES}" >> docker-compose.yml
+    echo "      JAVA_OPTS: \"${CI_ENV_JAVA_OPTS}\"" >> docker-compose.yml
+    echo "    deploy:" >> docker-compose.yml
+    echo "      resources:" >> docker-compose.yml
+    echo "        limits:" >> docker-compose.yml
+    echo "          memory: ${CI_DOCKER_LIMIT_MEMORY}" >> docker-compose.yml
+    echo "    ports:" >> docker-compose.yml
+    echo "      - '${CONTAINER_PORT}'" >> docker-compose.yml
+    echo "    dns:" >> docker-compose.yml
+    echo "      - ${CI_DNS_PRIMARY}" >> docker-compose.yml
+    echo "      - ${CI_DNS_SECONDARY}" >> docker-compose.yml
+    echo "    dns_search:" >> docker-compose.yml
+    echo "      - ${CI_DNS_SEARCH}" >> docker-compose.yml
+    echo "    networks:" >> docker-compose.yml
+    echo "      - default" >> docker-compose.yml
+    echo "    volumes:" >> docker-compose.yml
+    echo "      - /etc/empresa:/etc/empresa" >> docker-compose.yml
+    echo "      - /etc/resolv.conf.docker:/etc/resolv.conf" >> docker-compose.yml
+    echo "    restart: unless-stopped" >> docker-compose.yml
+    echo "    labels:" >> docker-compose.yml
+    echo "      - 'traefik.enable=true'" >> docker-compose.yml
+    echo "      - 'traefik.http.routers.${CI_PROJECT_NAME}.rule=Host(\`${CI_PRD_SERVER_ADDRESS}\`) && PathPrefix(\`/${CI_PROJECT_NAME}\`)'" >> docker-compose.yml
+    echo "networks:" >> docker-compose.yml
+    echo "  default:" >> docker-compose.yml 
+    echo "    name: webapi" >> docker-compose.yml
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "mkdir -p ${PROJECT_PATH_COMPOSE} 2>/dev/null || true"
+   - scp -o StrictHostKeyChecking=no docker-compose.yml ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS}:${PROJECT_PATH_COMPOSE}/
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "docker-compose down --remove-orphans 2>/dev/null || true"
+   - ssh ${CI_REGISTRY_USER}@${CI_QA_SERVER_ADDRESS} "docker image rm ${IMAGE}:${POM_VERSAO} 2>/dev/null || true"
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d"
+  only:
+   - rollback
