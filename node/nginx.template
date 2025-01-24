@@ -1,0 +1,14 @@
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location /$APPLICATION_PATH/ {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /$APPLICATION_PATH/index.html;
+    }
+
+    error_page 404 /$APPLICATION_PATH/index.html;
+}
