@@ -90,7 +90,6 @@ docker_qa_build:
     echo "    restart: unless-stopped" >> docker-compose.yml
     echo "    labels:" >> docker-compose.yml
     echo "      - app_version=${APP_VERSION}" >> docker-compose.yml
-    echo "      - app_env=QA" >> docker-compose.yml
     echo "      - app_job=${CI_PIPELINE_ID}" >> docker-compose.yml
     echo "      - 'traefik.enable=true'" >> docker-compose.yml
     echo "      - 'traefik.http.routers.${CI_PROJECT_NAME}.rule=Host(\`${CI_QA_SERVER_ADDRESS}\`) && PathPrefix(\`/${CI_PROJECT_NAME}\`)'" >> docker-compose.yml
@@ -148,7 +147,6 @@ docker_prd_deploy:
     echo "    restart: unless-stopped" >> docker-compose.yml
     echo "    labels:" >> docker-compose.yml
     echo "      - app_version=${APP_VERSION}" >> docker-compose.yml
-    echo "      - app_env=PRD" >> docker-compose.yml
     echo "      - app_job=${CI_PIPELINE_ID}" >> docker-compose.yml
     echo "      - 'traefik.enable=true'" >> docker-compose.yml
     echo "      - 'traefik.http.routers.${CI_PROJECT_NAME}.rule=Host(\`${CI_PRD_SERVER_ADDRESS}\`) && PathPrefix(\`/${CI_PROJECT_NAME}\`)'" >> docker-compose.yml
@@ -198,7 +196,6 @@ docker_prd_deploy_rollback:
     echo "    restart: unless-stopped" >> docker-compose.yml
     echo "    labels:" >> docker-compose.yml
     echo "      - app_version=${APP_VERSION}" >> docker-compose.yml
-    echo "      - app_env=PRD" >> docker-compose.yml
     echo "      - app_job=${CI_PIPELINE_ID}" >> docker-compose.yml
     echo "      - 'traefik.enable=true'" >> docker-compose.yml
     echo "      - 'traefik.http.routers.${CI_PROJECT_NAME}.rule=Host(\`${CI_PRD_SERVER_ADDRESS}\`) && PathPrefix(\`/${CI_PROJECT_NAME}\`)'" >> docker-compose.yml
