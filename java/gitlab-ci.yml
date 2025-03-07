@@ -157,7 +157,8 @@ docker_prd_deploy:
    - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "mkdir -p ${PROJECT_PATH_COMPOSE} 2>/dev/null || true"
    - scp -o StrictHostKeyChecking=no docker-compose.yml ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS}:${PROJECT_PATH_COMPOSE}/
    - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "cd ${PROJECT_PATH_COMPOSE} && docker-compose down --remove-orphans 2>/dev/null || true"
-   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "docker image rm -f ${IMAGE_LATEST} 2>/dev/null || true"
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "docker image rm -f ${IMAGE}:${APP_VERSION} 2>/dev/null || true"
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "docker pull ${IMAGE}:${APP_VERSION} 2>/dev/null || true"
    - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d"
   only:
    - main
@@ -207,6 +208,7 @@ docker_prd_deploy_rollback:
    - scp -o StrictHostKeyChecking=no docker-compose.yml ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS}:${PROJECT_PATH_COMPOSE}/
    - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "cd ${PROJECT_PATH_COMPOSE} && docker-compose down --remove-orphans 2>/dev/null || true"
    - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "docker image rm -f ${IMAGE}:${APP_VERSION} 2>/dev/null || true"
+   - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "docker pull ${IMAGE}:${APP_VERSION} 2>/dev/null || true"
    - ssh ${CI_REGISTRY_USER}@${CI_PRD_SERVER_ADDRESS} "cd ${PROJECT_PATH_COMPOSE} && docker-compose up -d"
   only:
    - rollback
